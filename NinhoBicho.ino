@@ -1,41 +1,9 @@
 //
 //
 //
-#include "debug.h"
+#include "NinhoBicho.h"
 
-#define ENA_PIN 5
-#define IN1_PIN 6
-#define IN2_PIN 7
 
-#define CLOSED_TRAY_SWITCH_PIN 10
-#define OPENED_TRAY_SWITCH_PIN 11
-
-#define NEAR_DISTANCE 100 // 
-#define MEDIUM_DISTANCE 150 // 
-#define FAR_DISTANCE  210 // 
-#define MAX_DISTANCE  200 // Maximum distance we want to ping for (in centimeters). Maximum sensor distance is rated at 400-500cm.
-
-#define SLOW_MOTOR_POWER 160//120
-#define MEDIUM_MOTOR_POWER 220//180
-#define FAST_MOTOR_POWER 255//230
-
-#define SLOW_TRAY_DELAY 1000
-#define MEDIUM_TRAY_DELAY 600
-#define FAST_TRAY_DELAY 400
-
-#define NULL_TRAY_DELAY (0-1)
-
-#define SENSOR_ANALOG_PIN A0
-
-//NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE); // NewPing setup of pins and maximum distance.
-
-uint8_t trayDirection = 0;
-uint16_t motorPower = 0;
-
-typedef enum{TRAY_IDLE,TRAY_DETECTED,TRAY_OPEN,TRAY_CLOSE}trayPulseState;
-typedef enum{SENSOR_IDLE,SENSOR_OBJECT_NEAR,SENSOR_OBJECT_MEDIUM,SENSOR_OBJECT_FAR}sensorState;
-
-enum{SLOW,MEDIUM,FAST,STOPPED};
 
 void setup()
 {
@@ -45,6 +13,8 @@ void setup()
   pinMode(IN1_PIN, OUTPUT);
   pinMode(IN2_PIN, OUTPUT); 
 
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
   
   pinMode(CLOSED_TRAY_SWITCH_PIN, INPUT); 
   digitalWrite(CLOSED_TRAY_SWITCH_PIN, HIGH);
@@ -71,7 +41,15 @@ bool isTrayOpened()
 
 uint16_t readSensor()
 {
-  return (analogRead(SENSOR_ANALOG_PIN)/2)*2.54;   
+  return analogRead(SENSOR_ANALOG_PIN);   //(analogRead(SENSOR_ANALOG_PIN)/2)*2.54;   
+}
+
+void toggleLED()
+{
+  static bool ledState=false;
+
+  ledState=!ledState;
+  digitalWrite(LED_PIN,ledState);
 }
 
 void stopTray()
@@ -111,15 +89,15 @@ void loop()
   bTrayOpened=isTrayOpened();
   distance=readSensor();
 
-  DEBUG_PRINT("Distance: ");
-  DEBUG_PRINTLN(distance);
-  
+
+  DEBUG_PRINTLN();
+ 
       //is the sensor reading within range?
       if(distance>FAR_DISTANCE)
       {
         //remains idle
         sensorMode=STOPPED;
-        DEBUG_PRINTLN("STOPPED ");
+        DEBUG_PRINT("sensorMode: STOPPED");
       }
       else if(distance<FAR_DISTANCE && distance>MEDIUM_DISTANCE)
       {
@@ -127,7 +105,7 @@ void loop()
           sensorMode=SLOW;
           motorPower=SLOW_MOTOR_POWER;
           //trayDelay=SLOW_TRAY_DELAY; 
-          DEBUG_PRINTLN("SLOW");
+          DEBUG_PRINT("sensorMode: SLOW");
       
       }
       else if(distance<MEDIUM_DISTANCE && distance>NEAR_DISTANCE)
@@ -136,8 +114,8 @@ void loop()
           sensorMode=MEDIUM;
           motorPower=MEDIUM_MOTOR_POWER;
           //trayDelay=MEDIUM_TRAY_DELAY; 
-          DEBUG_PRINTLN("MEDIUM");
-      
+          DEBUG_PRINT("sensorMode: MEDIUM");
+     
       }
       else if(distance<NEAR_DISTANCE)
       {
@@ -145,10 +123,12 @@ void loop()
           sensorMode=FAST;
           motorPower=FAST_MOTOR_POWER;
           //trayDelay=FAST_TRAY_DELAY;  
-          DEBUG_PRINTLN("FAST");         
+          DEBUG_PRINT("sensorMode: FAST");         
       }
-        
-  
+
+  DEBUG_PRINT(" | Distance: ");
+  DEBUG_PRINTLN(distance);
+
   switch(currentTrayState)
   {
     case TRAY_IDLE:
@@ -156,10 +136,10 @@ void loop()
       if(sensorMode!=STOPPED)
       {
         currentTrayState=TRAY_DETECTED;
-        DEBUG_PRINTLN("TRAY_IDLE -> TRAY_DETECTED ");
+        DEBUG_PRINTLN("currentTrayState: TRAY_IDLE -> TRAY_DETECTED ");
       }
       stopTray();
-      DEBUG_PRINTLN("TRAY_IDLE ");
+      DEBUG_PRINTLN("currentTrayState: TRAY_IDLE ");
     break;
     
     case TRAY_DETECTED:
@@ -168,26 +148,26 @@ void loop()
       {
         currentTrayState=TRAY_OPEN;
         //trayDelay=SLOW_TRAY_DELAY;
-        DEBUG_PRINTLN("TRAY_DETECTED -> SLOW ");
+        DEBUG_PRINTLN("currentTrayState: TRAY_DETECTED -> SLOW ");
         
       }
       else if(sensorMode==MEDIUM)
       {
         currentTrayState=TRAY_OPEN;
         //trayDelay=MEDIUM_TRAY_DELAY;
-        DEBUG_PRINTLN("TRAY_DETECTED -> MEDIUM ");
+        DEBUG_PRINTLN("currentTrayState: TRAY_DETECTED -> MEDIUM ");
       } 
       else if(sensorMode==FAST)
       {
         currentTrayState=TRAY_OPEN;
         //trayDelay=FAST_TRAY_DELAY;
-        DEBUG_PRINTLN("TRAY_DETECTED -> FAST ");
+        DEBUG_PRINTLN("currentTrayState: TRAY_DETECTED -> FAST ");
       } 
       else
       {
         currentTrayState=TRAY_IDLE;
         //trayDelay=NULL_TRAY_DELAY;
-        DEBUG_PRINTLN("TRAY_DETECTED -> TRAY_IDLE ");        
+        DEBUG_PRINTLN("currentTrayState: TRAY_DETECTED -> TRAY_IDLE ");        
       }
     break;
             
@@ -196,12 +176,12 @@ void loop()
        //delay(trayDelay);
        if(!bTrayOpened)
        {
-        DEBUG_PRINTLN("TRAY_OPEN -> bTrayOpened false ");        
+        DEBUG_PRINTLN("currentTrayState: TRAY_OPEN -> bTrayOpened false ");        
         break;
        }
        //stopTray();
        currentTrayState=TRAY_CLOSE;
-       DEBUG_PRINTLN("TRAY_OPEN -> TRAY_CLOSE ");        
+       DEBUG_PRINTLN("currentTrayState: TRAY_OPEN -> TRAY_CLOSE ");        
        
     break;
     
@@ -210,17 +190,18 @@ void loop()
        //delay(trayDelay);
        if(!bTrayClosed)
        {
-        DEBUG_PRINTLN("TRAY_CLOSE -> bTrayClosed false ");        
+        DEBUG_PRINTLN("currentTrayState: TRAY_CLOSE -> bTrayClosed false ");        
         break;
        }
        //stopTray();
        currentTrayState=TRAY_DETECTED;
-       DEBUG_PRINTLN("TRAY_CLOSE -> TRAY_DETECTED ");        
+       DEBUG_PRINTLN("currentTrayState: TRAY_CLOSE -> TRAY_DETECTED ");        
 
     break;
   }
-   //delay(100);
+   delay(200);
 }
+
 /*
 void loop_() {
   uint8_t potValue = analogRead(A0); // Read potentiometer value
